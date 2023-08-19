@@ -87,7 +87,7 @@ end proc: # c_code_export_vector
 
 c_code_export_list := proc(entries :: list)
     local code, split, i:
-    code := CodeGeneration[C](entries, optimize=true, output=string):
+    code := CodeGeneration[C](entries, optimize=true, output=string, coercetypes=false):
     split := StringTools[StringSplit](code, "\n"):
     return cat(seq(sprintf("float_t %s\n", split[i]), i=1..nops(split)-1)):
 end proc: # c_code_export_list
