@@ -6,6 +6,9 @@
 using maple::float_t;
 using maple::Matrix;
 using maple::Vector;
+using maple::MatrixRef;
+using maple::VectorRef;
+
 
 $declarations
 

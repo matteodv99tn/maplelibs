@@ -43,7 +43,7 @@ c_code_export_matrix := proc(A :: Matrix, name :: string)
             if evalb(elem <> 0) then:
                 elem_name := "tmp__"||i||"_"||j:
                 A_list := [op(A_list), convert(elem_name, symbol) = elem]:
-                A_assigns := [op(A_assigns), sprintf("%s(%d, %d) = %s;\n", name, i, j, elem_name)]:
+                A_assigns := [op(A_assigns), sprintf("%s(%d, %d) = %s;\n", name, i-1, j-1, elem_name)]:
             end if:
         end do:
     end do:
@@ -69,7 +69,7 @@ c_code_export_vector := proc(v :: Vector, name :: string)
         if evalb(elem <> 0) then:
             elem_name := "tmp__"||i:
             v_list := [op(v_list), convert(elem_name, symbol) = elem]:
-            v_assigns := [op(v_assigns), sprintf("%s(%d) = %s;\n", name, i, elem_name)]:
+            v_assigns := [op(v_assigns), sprintf("%s(%d) = %s;\n", name, i-1, elem_name)]:
         end if:
     end do:
 
@@ -179,4 +179,13 @@ c_code_generate := proc(code_table :: table)
         ]):
 
 end proc: # c_code_generate
+
+
+c_code_to_json := proc(code_table :: table, filename)
+    local content, file:
+    content := JSON:-ToString(c_code_generate(code_table)):
+    file := fopen(filename, WRITE):
+    fprintf(file, content):
+    fclose(file):
+end proc: # c_code_to_json
 

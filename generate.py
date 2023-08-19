@@ -44,8 +44,8 @@ def format_code(path):
             print(f"Failed to format {path} with clang-format")
 
 
-def process_codegen_input(json_data: str):
-    with open("codegeneration.txt", "r") as file:
+def process_codegen_input(json_filename: str):
+    with open(json_filename, "r") as file:
         generated_data = json.load(file)
 
     name = generated_data["name"].lower()
@@ -54,12 +54,14 @@ def process_codegen_input(json_data: str):
     initialization = list()
 
     if generated_data["has_x"]:
-        signature.append("const Vector& x")
+        signature.append("VectorRef x")
+        # signature.append("const Vector& x")
         for idx, state in enumerate(generated_data["x"]):
             initialization.append(f"const float_t {state} = x[{idx}];")
 
     if generated_data["has_u"]:
-        signature.append("const Vector& u")
+        signature.append("VectorRef u")
+        # signature.append("const Vector& u")
         for idx, input in enumerate(generated_data["u"]):
             initialization.append(f"const float_t {input} = u[{idx}];")
 

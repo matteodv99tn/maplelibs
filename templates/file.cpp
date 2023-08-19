@@ -5,8 +5,8 @@
 using maple::float_t;
 using maple::Matrix;
 using maple::Vector;
-
-$parameters
+using maple::MatrixRef;
+using maple::VectorRef;
 
 
 $implementations
