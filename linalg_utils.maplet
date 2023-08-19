@@ -1,0 +1,53 @@
+with(LinearAlgebra):
+
+
+DIFF := proc(f, x)
+    return(subs(__tmp = x, diff(subs(x = __tmp, f), __tmp)))
+end proc:
+
+
+Gradient := proc(f, x::{list, Vector})
+    local i, var, fun, grad;
+
+    fun := convert(f, list):
+    var := convert(x, list):
+
+    grad := Vector(nops(var)):
+    for i from 1 to nops(var) do
+        grad[i] := simplify(DIFF(f, var[i])):
+    end do:
+
+    return grad:
+end proc:
+
+
+Jacobian := proc(f, x::{list, Vector})
+
+    local var, fun, i, jac:
+    var := convert(x, list):
+
+    if type(f, {list, Vector}) then
+        fun := convert(f, list):
+        jac := <seq(Transpose(Gradient(fun[i], x)), i=1..nops(fun))>
+    else
+        jac := Transpose(Gradient(f, x)):
+    end if:
+
+    return jac:
+end proc:
+
+
+Hessian := proc(f, x::{list, Vector})
+    local i, j, H, vars:
+    vars := convert(x, list):
+    H := Matrix(nops(vars), nops(vars)):
+
+    for i from 1 to nops(vars) do
+        for j from i to nops(vars) do
+            H[i, j] := simplify(DIFF(DIFF(f, vars[i]), vars[j])):
+            if i != j then
+                H[j, i] := H[i, j]:
+            end if:
+        end do:
+    end do:
+end proc:

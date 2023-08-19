@@ -1,0 +1,182 @@
+c_code_initialize := proc(func_name :: string)
+    return table([
+            "name" = func_name,
+            "func" = [],
+            "x" = [],
+            "u" = [],
+            "params" = []
+        ])
+end proc: # c_code_initialize
+
+
+c_code_assign_function := proc(code_table :: table, func :: {list, Vector})
+    code_table["func"] := func:
+end proc:
+
+
+c_code_assign_state := proc(code_table :: table, x :: {list, Vector})
+    code_table["x"] := convert(x, list):
+end proc:
+
+
+c_code_assign_input := proc(code_table :: table, u :: {list, Vector})
+    code_table["u"] := convert(u, list):
+end proc:
+
+
+c_code_assign_parameters := proc(code_table :: table, p :: {list, Vector}, values :: {list, Vector})
+    code_table["params"] := convert(p, list):
+    code_table["params_values"] := convert(values, list):
+end proc:
+
+
+c_code_export_matrix := proc(A :: Matrix, name :: string)
+    local A_code, i, j, rows, cols, A_list, A_assigns, elem, elem_name:
+    rows, cols := Dimensions(A):
+    A_code := sprintf("Matrix %s = Matrix::Zero(%d, %d);\n", name, rows, cols):
+
+    A_list := []:
+    A_assigns := []:
+    for i from 1 to rows do
+        for j from 1 to cols do
+            elem := simplify(A[i, j]):
+            if evalb(elem <> 0) then:
+                elem_name := "tmp__"||i||"_"||j:
+                A_list := [op(A_list), convert(elem_name, symbol) = elem]:
+                A_assigns := [op(A_assigns), sprintf("%s(%d, %d) = %s;\n", name, i, j, elem_name)]:
+            end if:
+        end do:
+    end do:
+    A_code := cat(
+            A_code,
+            "\n",
+            c_code_export_list(A_list),
+            "\n",
+            op(A_assigns)):
+    return A_code:
+end proc: # c_code_export_matrix
+
+
+c_code_export_vector := proc(v :: Vector, name :: string)
+    local v_code, i, rows, v_list, v_assigns, elem, elem_name:
+    rows := Dimensions(v):
+    v_code := sprintf("Vector %s = Vector::Zero(%d);\n", name, rows):
+
+    v_list := []:
+    v_assigns := []:
+    for i from 1 to rows do
+        elem := simplify(v[i]):
+        if evalb(elem <> 0) then:
+            elem_name := "tmp__"||i:
+            v_list := [op(v_list), convert(elem_name, symbol) = elem]:
+            v_assigns := [op(v_assigns), sprintf("%s(%d) = %s;\n", name, i, elem_name)]:
+        end if:
+    end do:
+
+    v_code := cat(
+            v_code,
+            "\n",
+            c_code_export_list(v_list),
+            "\n",
+            op(v_assigns)):
+
+    return v_code:
+
+end proc: # c_code_export_vector
+
+
+c_code_export_list := proc(entries :: list)
+    local code, split, i:
+    code := CodeGeneration[C](entries, optimize=true, output=string):
+    split := StringTools[StringSplit](code, "\n"):
+    return cat(seq(sprintf("float_t %s\n", split[i]), i=1..nops(split)-1)):
+end proc: # c_code_export_list
+
+
+c_code_export := proc(func, name::string)
+    if type(func, {list, Vector}) then
+        return c_code_export_vector(convert(func, Vector), name):
+    elif type(func, {Matrix}) then
+        return c_code_export_matrix(func, name):
+    end if:
+
+    printf("Exporting %s\n", convert(whattype(func), string)):
+    error "Don't know how to export"
+end proc:
+
+
+to_string_vector := proc(input :: string)
+    return StringTools:-StringSplit(input, "\n"):
+end proc:
+
+
+c_code_generate := proc(code_table :: table)
+    local all_vars, remove_t, subbed_vars, i, json_table, X, U, P, F:
+    X := code_table["x"]:
+    U := code_table["u"]:
+    P := code_table["params"]:
+    F := code_table["func"]:
+    all_vars := [op(X), op(U), op(P)]:
+
+    remove_t := []:
+    for i from 1 to nops(all_vars) do:
+        if type(all_vars[i], function) then
+            remove_t := [op(remove_t), all_vars[i] = op(0, all_vars[i])]:
+        end if:
+    end do:
+    subbed_vars := subs(remove_t, all_vars):
+    X := subs(remove_t, X):
+    U := subs(remove_t, U):
+    P := subs(remove_t, P):
+    F := subs(remove_t, F):
+
+
+    local extract_x, extract_u, extract_p:
+    extract_x := cat("", seq(sprintf("float_t %s = x(%d);\n", convert(X[i], string), i-1), i=1..nops(X))):
+    extract_u := cat("", seq(sprintf("float_t %s = u(%d);\n", convert(U[i], string), i-1), i=1..nops(U))):
+    extract_p := cat("", seq(sprintf("float_t %s = params->%s;\n", convert(P[i], string), convert(P[i], string)), i=1..nops(P))):
+
+
+    local has_x, has_u, has_p:
+    if nops(X) <> 0 then has_x := true else has_x := false end if:
+    if nops(U) <> 0 then has_u := true else has_u := false end if:
+    if nops(P) <> 0 then has_p := true else has_p := false end if:
+
+    local func, func_dx, func_du:
+
+
+    func := c_code_export(F, "func"):
+    if nops(X) > 0 then func_dx := c_code_export(Jacobian(F, X), "func_dx") else func_dx := "" end if:
+    if nops(U) > 0 then func_du := c_code_export(Jacobian(F, U), "func_du") else func_du := "" end if:
+
+    local dim_f:
+    if type(F, {list, Vector}) then
+        dim_f := nops(convert(F, list)):
+    else
+        dim_f := 1:
+    end if:
+
+    return table([
+            "name" = code_table["name"],
+            "extract_x" = extract_x,
+            "extract_u" = extract_u,
+            "param_list" = subs(remove_t, P),
+            "extract_p" = extract_p,
+            "has_x" = has_x,
+            "has_u" = has_u,
+            "has_p" = has_p,
+            "x" = X,
+            "u" = U,
+            "p" = P,
+            "p_values" = code_table["params_values"],
+            "dim_x" = nops(X),
+            "dim_u" = nops(U),
+            "dim_p" = nops(P),
+            "dim_f" = dim_f,
+            "func" = func,
+            "func_dx" = func_dx,
+            "func_du" = func_du
+        ]):
+
+end proc: # c_code_generate
+
