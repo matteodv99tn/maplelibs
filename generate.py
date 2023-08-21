@@ -204,10 +204,12 @@ if __name__ == "__main__":
                 join(BASE_DIR, "CMakeLists.txt"))
 
     if autobuild:
+        from multiprocessing import cpu_count
+
         print("--> Building")
         build_dir = join(BASE_DIR, "build")
         os.makedirs(build_dir, exist_ok=True)
         os.chdir(build_dir)
         subprocess.run(["cmake", ".."], check=True)
-        subprocess.run(["make"], check=True)
+        subprocess.run(["make", f"-j{cpu_count()}"], check=True)
         subprocess.run(["make", "install"], check=True)

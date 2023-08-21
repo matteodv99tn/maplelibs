@@ -4,7 +4,9 @@ c_code_initialize := proc(func_name :: string)
             "func" = [],
             "x" = [],
             "u" = [],
-            "params" = []
+            "params" = [],
+            "has_jac_x" = false,
+            "has_jac_u" = false
         ])
 end proc: # c_code_initialize
 
@@ -27,6 +29,18 @@ end proc:
 c_code_assign_parameters := proc(code_table :: table, p :: {list, Vector}, values :: {list, Vector})
     code_table["params"] := convert(p, list):
     code_table["params_values"] := convert(values, list):
+end proc:
+
+
+c_code_set_jacobian_x := proc(code_table :: table, jac :: {list, Vector, Matrix})
+    code_table["jac_x"] := jac:
+    code_table["has_jac_x"] := true:
+end proc:
+
+
+c_code_set_jacobian_u := proc(code_table :: table, jac :: {list, Vector, Matrix})
+    code_table["jac_u"] := jac:
+    code_table["has_jac_u"] := true:
 end proc:
 
 
@@ -89,7 +103,7 @@ c_code_export_list := proc(entries :: list)
     local code, split, i:
     code := CodeGeneration[C](entries, optimize=true, output=string, coercetypes=false):
     split := StringTools[StringSplit](code, "\n"):
-    return cat(seq(sprintf("float_t %s\n", split[i]), i=1..nops(split)-1)):
+    return cat(seq(sprintf("const float_t %s\n", split[i]), i=1..nops(split)-1)):
 end proc: # c_code_export_list
 
 
@@ -137,17 +151,32 @@ c_code_generate := proc(code_table :: table)
     extract_p := cat("", seq(sprintf("float_t %s = params->%s;\n", convert(P[i], string), convert(P[i], string)), i=1..nops(P))):
 
 
-    local has_x, has_u, has_p:
+    local has_x, has_u, has_p, has_jac_x, has_jac_u, jac_x, jac_u:
     if nops(X) <> 0 then has_x := true else has_x := false end if:
     if nops(U) <> 0 then has_u := true else has_u := false end if:
     if nops(P) <> 0 then has_p := true else has_p := false end if:
+
+    has_jac_x := code_table["has_jac_x"]:
+    has_jac_u := code_table["has_jac_u"]:
+
+    if (nops(X) > 0) and not has_jac_x then
+        code_table["jac_x"] := Jacobian(F, X):
+        code_table["has_jac_x"] := true:
+    end if:
+    if (nops(U) > 0) and not has_jac_u then
+        code_table["jac_u"] := Jacobian(F, U):
+        code_table["has_jac_u"] := true:
+    end if:
+
+    jac_x := code_table["jac_x"]:
+    jac_u := code_table["jac_u"]:
 
     local func, func_dx, func_du:
 
 
     func := c_code_export(F, "func"):
-    if nops(X) > 0 then func_dx := c_code_export(Jacobian(F, X), "func_dx") else func_dx := "" end if:
-    if nops(U) > 0 then func_du := c_code_export(Jacobian(F, U), "func_du") else func_du := "" end if:
+    if nops(X) > 0 then func_dx := c_code_export(jac_x, "func_dx") else func_dx := "" end if:
+    if nops(U) > 0 then func_du := c_code_export(jac_u, "func_du") else func_du := "" end if:
 
     local dim_f:
     if type(F, {list, Vector}) then

@@ -3,10 +3,14 @@ project(pymodule_example)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(CMAKE_CXX_STANDARD 11)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DNDEBUG -O3")
 
 find_package(pybind11 REQUIRED)
 find_package(Eigen3 REQUIRED)
+
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
+endif()
+set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 include_directories("/usr/include/eigen3")
