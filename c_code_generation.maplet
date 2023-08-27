@@ -6,7 +6,8 @@ c_code_initialize := proc(func_name :: string)
             "u" = [],
             "params" = [],
             "has_jac_x" = false,
-            "has_jac_u" = false
+            "has_jac_u" = false,
+            "params_values" = []
         ])
 end proc: # c_code_initialize
 
